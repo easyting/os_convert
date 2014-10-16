@@ -32,7 +32,7 @@ function os_convert_admin_form($form, &$form_state) {
 
     $form['os_convert_run'] = array(
       '#type' => 'submit',
-      '#value' => $t['@processed'] > 0 ? t('Continue conversion') : t('Start conversion'),
+      '#value' => ($t['@processed'] > 0) ? t('Continue conversion') : t('Start conversion'),
       '#disabled' => ($t['@processed'] == $t['@count']) ? TRUE : FALSE,
     );
 

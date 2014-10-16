@@ -1,5 +1,6 @@
 /**
  * @file
+ * Run cyclic AJAX commands to keep the convertion process.
  */
 (function($) {
   Drupal.behaviors.os_convert_init = {
@@ -28,4 +29,4 @@
     }
   };
 
-})( jQuery );
+})(jQuery);
