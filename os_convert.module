@@ -85,14 +85,14 @@ function os_convert_update_objects() {
     'outputType'  => 'json',
     'start'       => '1',
     'stepValue'   => '1',
-    'query'       => 'rec.id=' . os_convert_generate_local_id_from_id($result[0]->ding_entity_id)
+    'query'       => 'rec.id=' . os_convert_generate_local_id_from_id($result[0]->ding_entity_id),
   );
   $response = $client->call('searchRequest', $parameters);
 
   $data = json_decode($response);
   $temp = array();
 
-  if ($data->searchResponse->result->hitCount > 0) {
+  if (is_object($data->searchResponse->result->hitCount) && $data->searchResponse->result->hitCount > 0) {
     foreach ($data->searchResponse->result->searchResult as $item) {
       $object = $item->collection->object[0];
       $os_3x_id = $object->identifier->{'$'};
