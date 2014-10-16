@@ -28,3 +28,11 @@ for this, since ting library was refactored;
 5. Conversion process will be time demanding. And by this is meant tens (if not hundreds) of hours
 too lookup all the records in the ting_object table. For a ~650k entries and a 800ms request time,
 it takes smth like ~144h to query and update them all.
+
+Usage:
+
+1. Enable OpenSearch Convert module;
+
+2. Go to admin/config/ting/os_convert;
+
+3. Follow the instructions.
