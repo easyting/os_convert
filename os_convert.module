@@ -1,0 +1,146 @@
+<?php
+/**
+ * @file
+ * Converts ID's from current OS version, to OS 3.1
+ */
+
+/**
+ * Implments hook_menu().
+ */
+function os_convert_menu() {
+  $menu = array();
+
+  $menu['admin/config/ting/os_convert'] = array(
+    'title' => 'OpenSearch convert',
+    'description' => 'Convert id\'s from one format to another',
+    'access arguments' => array('administer ting settings'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('os_convert_admin_form'),
+    'file' => 'os_convert.admin.inc',
+  );
+
+  $menu['admin/config/ting/os_convert/progress'] = array(
+    'title' => 'Conversion progress',
+    'access arguments' => array('administer ting settings'),
+    'page callback' => 'os_convert_progress',
+    'type' => MENU_CALLBACK,
+  );
+
+  return $menu;
+}
+
+/**
+ * AJAX callback.
+ *
+ * Mainly return current conversion status. Invokes next item id conversion
+ * if needed.
+ */
+function os_convert_progress() {
+  $count = os_convert_objects_count();
+  $processed = variable_get('os_convert_progress', 0);
+
+  $percentage = $processed * 100 / $count;
+  $t = array(
+    '@processed' => $processed,
+    '@count' => $count,
+    '@percentage' => sprintf("%.4f", $percentage),
+  );
+  echo drupal_json_encode(array(
+    'percentage' => $t['@percentage'],
+    'message' => t('Overall progress: @processed/@count (@percentage%)', $t),
+  ));
+
+  if ($processed < $count) {
+    os_convert_update_objects();
+  }
+
+  drupal_exit();
+}
+
+/**
+ * Fetch the item from the well and update it's id
+ * in the ting_object/ting_object_revision tables.
+ */
+function os_convert_update_objects() {
+  $processed = variable_get('os_convert_progress', 0);
+
+  $query = db_select('ting_object', 't')
+    ->fields('t', array('tid', 'ding_entity_id'))
+    ->range($processed, 1);
+
+  $result = $query->execute()->fetchAll();
+
+  $ting_query_string = array();
+
+  foreach ($result as $entry) {
+    $ting_query_string[$entry->tid] = $entry->ding_entity_id;
+  }
+
+  // @todo
+  // These could be a setting.
+  $client = new NanoSOAPClient('http://opensearch.addi.dk/3.1/');
+  $parameters = array(
+    'agency'      => '100200',
+    'profile'     => 'test',
+    'outputType'  => 'json',
+    'start'       => '1',
+    'stepValue'   => '1',
+    'query'       => 'rec.id=' . os_convert_generate_local_id_from_id($result[0]->ding_entity_id)
+  );
+  $response = $client->call('searchRequest', $parameters);
+
+  $data = json_decode($response);
+  $temp = array();
+
+  if ($data->searchResponse->result->hitCount > 0) {
+    foreach ($data->searchResponse->result->searchResult as $item) {
+      $object = $item->collection->object[0];
+      $os_3x_id = $object->identifier->{'$'};
+      $temp[$result[0]->ding_entity_id] = $os_3x_id;
+    }
+  }
+
+  foreach ($ting_query_string as $tid => $ding_entitiy_id) {
+    if (isset($temp[$ding_entitiy_id])) {
+      db_update('ting_object')
+        ->fields(array(
+          'ding_entity_id' => $temp[$ding_entitiy_id],
+        ))
+        ->condition('tid', $tid, '=')
+        ->execute();
+    }
+    else {
+      // @todo
+      // Probably write a log of items that could not be converted.
+    }
+  }
+
+  $processed += 1;
+  variable_set('os_convert_progress', $processed);
+}
+
+/**
+ * Get the local from full id (faust number).
+ */
+function os_convert_generate_local_id_from_id($item_id) {
+  $id = explode(':', $item_id);
+
+  return $id[1];
+}
+
+/**
+ * Simply count how many objects are there.
+ *
+ * Statically cached, call whenever we want it.
+ */
+function os_convert_objects_count() {
+  $count = drupal_static(__FUNCTION__, NULL);
+
+  if (!is_int($count)) {
+    $query = db_select('ting_object')->countQuery();
+    $result = $query->execute()->fetchCol('expression');
+    $count = $result[0];
+  }
+
+  return $count;
+}

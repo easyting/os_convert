@@ -1,0 +1,9 @@
+#os-convert-progress .loader {
+  background-image: url('/misc/throbber.gif');
+  background-position: 0 60px;
+  display: inline-block;
+  height: 17px;
+  margin-left: 5px;
+  vertical-align: bottom;
+  width: 14px;
+}
