@@ -1,0 +1,107 @@
+<?php
+/**
+ * @file
+ *
+ * Install/uninstall routine.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function os_convert_schema() {
+  $schema = array();
+
+  $schema['ting_object_convert'] = array(
+    'description' => 'Keep track of converted identifiers',
+    'fields' =>
+    array(
+      'cid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'old_id' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'new_id' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array(
+      'cid',
+    ),
+    'unique keys' => array(
+      'uniq_tid' => array(
+        'tid'
+      ),
+    ),
+    'indexes' => array(
+      'ind_old_id' => array('old_id'),
+      'ind_new_id' => array('new_id'),
+    ),
+  );
+
+  $schema['ting_object_leftover'] = array(
+    'description' => 'Keep track of missing identifiers',
+    'fields' => array(
+      'lid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'ding_entity_id' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      )
+    ),
+    'primary key' => array(
+      'lid',
+    ),
+    'unique keys' => array(
+      'uniq_tid' => array(
+        'tid'
+      ),
+    ),
+    'indexes' => array(
+      'ind_ent_id' => array('ding_entity_id'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function os_convert_install() {
+  variable_set('os_convert_remapped', FALSE);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function os_convert_uninstall() {
+  variable_del('os_convert_count');
+  variable_del('os_objects_count');
+  variable_del('os_objects_leftover_count');
+  variable_del('os_convert_remapped');
+  variable_del('os_tmp_processed');
+}

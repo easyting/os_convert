@@ -4,6 +4,8 @@
  * Converts ID's from current OS version, to OS 3.1
  */
 
+define('OS_CONVERT_STEP', 2000);
+
 /**
  * Implments hook_menu().
  */
@@ -22,7 +24,7 @@ function os_convert_menu() {
   $menu['admin/config/ting/os_convert/progress'] = array(
     'title' => 'Conversion progress',
     'access arguments' => array('administer ting settings'),
-    'page callback' => 'os_convert_progress',
+    'page callback' => 'os_convert_count',
     'type' => MENU_CALLBACK,
   );
 
@@ -35,9 +37,9 @@ function os_convert_menu() {
  * Mainly return current conversion status. Invokes next item id conversion
  * if needed.
  */
-function os_convert_progress() {
+function os_convert_count() {
   $count = os_convert_objects_count();
-  $processed = variable_get('os_convert_progress', 0);
+  $processed = $count - os_convert_leftover_count(TRUE);
 
   $percentage = $processed * 100 / $count;
   $t = array(
@@ -62,11 +64,11 @@ function os_convert_progress() {
  * in the ting_object/ting_object_revision tables.
  */
 function os_convert_update_objects() {
-  $processed = variable_get('os_convert_progress', 0);
+  $processed = variable_get('os_tmp_processed', 0);
 
-  $query = db_select('ting_object', 't')
-    ->fields('t', array('tid', 'ding_entity_id'))
-    ->range($processed, 1);
+  $query = db_select('ting_object_leftover', 'tiol')
+    ->fields('tiol', array('tid', 'ding_entity_id'))
+    ->range(0, 1);
 
   $result = $query->execute()->fetchAll();
 
@@ -108,6 +110,15 @@ function os_convert_update_objects() {
         ))
         ->condition('tid', $tid, '=')
         ->execute();
+
+      db_merge('ting_object_convert')
+        ->fields(array(
+          'tid' => $tid,
+          'old_id' => $result[0]->ding_entity_id,
+          'new_id' => $temp[$ding_entitiy_id],
+        ))
+        ->condition('tid', $tid, '=')
+        ->execute();
     }
     else {
       // @todo
@@ -115,8 +126,12 @@ function os_convert_update_objects() {
     }
   }
 
-  $processed += 1;
-  variable_set('os_convert_progress', $processed);
+  db_delete('ting_object_leftover')
+    ->condition('tid', $result[0]->tid, '=')
+    ->execute();
+
+  $processed++;
+  variable_set('os_tmp_processed', $processed);
 }
 
 /**
@@ -129,17 +144,111 @@ function os_convert_generate_local_id_from_id($item_id) {
 }
 
 /**
- * Simply count how many objects are there.
+ * Fill the table with objects id's that are pending conversion.
+ *
+ * Plain sql for this would be:
+ *   SELECT t1.tid FROM `ting_object` t1
+ *   LEFT JOIN `ting_object_convert` t2
+ *   ON t1.tid = t2.tid
+ *   WHERE t2.tid IS NULL
+ *
+ * In plain words - what exists in t1 and not in t2.
+ */
+function os_convert_update_left_over() {
+  $start = 0;
+  db_query('TRUNCATE `ting_object_leftover`');
+
+  while (TRUE) {
+    $result = db_query(""
+      . "SELECT t1.tid, t1.ding_entity_id "
+      . "FROM `ting_object` t1 "
+      . "LEFT JOIN `ting_object_convert` t2 "
+      . "ON t1.tid = t2.tid "
+      . "WHERE t2.tid IS NULL "
+      . "LIMIT $start," . OS_CONVERT_STEP)
+      ->fetchAll();
+
+    if (empty($result)) {
+      break;
+    }
+
+    $left_over_query = db_insert('ting_object_leftover')
+      ->fields(array(
+        'tid',
+        'ding_entity_id',
+    ));
+
+    foreach ($result as $row) {
+      $left_over_query
+        ->values(array(
+          'tid' => $row->tid,
+          'ding_entity_id' => $row->ding_entity_id,
+      ));
+    }
+
+    $left_over_query->execute();
+    $start += OS_CONVERT_STEP;
+  }
+}
+
+/**
+ * COunt how many objects had been processed.
  *
  * Statically cached, call whenever we want it.
  */
-function os_convert_objects_count() {
-  $count = drupal_static(__FUNCTION__, NULL);
+function os_convert_processed_count($reset = FALSE) {
+  $count = &drupal_static(__FUNCTION__, NULL);
 
-  if (!is_int($count)) {
+  if (!is_int($count) || $reset) {
+    $query = db_select('ting_object_convert')->countQuery();
+    $result = $query->execute()->fetchCol('expression');
+    $count = $result[0];
+    variable_set('os_convert_count', $count);
+  }
+  else {
+    $count = variable_get('os_convert_count', 0);
+  }
+
+  return $count;
+}
+
+/**
+ * Count how many objects are there.
+ *
+ * Statically cached, call whenever we want it.
+ */
+function os_convert_objects_count($reset = FALSE) {
+  $count = &drupal_static(__FUNCTION__, NULL);
+
+  if (!is_int($count) || $reset) {
     $query = db_select('ting_object')->countQuery();
     $result = $query->execute()->fetchCol('expression');
     $count = $result[0];
+    variable_set('os_objects_count', $count);
+  }
+  else {
+    $count = variable_get('os_objects_count', 0);
+  }
+
+  return $count;
+}
+
+/**
+ * Count how many objects pending conversion.
+ *
+ * Statically cached, call whenever we want it.
+ */
+function os_convert_leftover_count($reset = FALSE) {
+  $count = &drupal_static(__FUNCTION__, NULL);
+
+  if (!is_int($count) || $reset) {
+    $query = db_select('ting_object_leftover')->countQuery();
+    $result = $query->execute()->fetchCol('expression');
+    $count = $result[0];
+    variable_set('os_objects_leftover_count', $count);
+  }
+  else {
+    $count = variable_get('os_objects_leftover_count', 0);
   }
 
   return $count;
