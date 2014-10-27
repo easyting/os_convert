@@ -50,7 +50,7 @@ function os_convert_admin_form($form, &$form_state) {
 
   if (!isset($form_state['os_convert_init'])) {
     $form['os_convert_map'] = array(
-      '#type' =>'textarea',
+      '#type' => 'textarea',
       '#cols' => 20,
       '#rows' => 20,
       '#default_value' => variable_get('os_convert_map', OS_DEFAULT_MAP),
@@ -97,15 +97,17 @@ function os_convert_admin_form($form, &$form_state) {
       '#disabled' => ($t['@processed'] == $t['@count'] || !$remapped) ? TRUE : FALSE,
     );
 
-    /*$form['os_convert_actions']['os_convert_reset'] = array(
+    /*
+    $form['os_convert_actions']['os_convert_reset'] = array(
       '#type' => 'submit',
       '#value' => t('Reset'),
       '#submit' => array('os_convert_admin_form_reset'),
-    );*/
+    );
+    */
 
     $form['os_convert_warning'] = array(
       '#type' => 'item',
-      '#markup' => t('<em>Better backup your database first! Also make sure the php\'s max_execution and memory_limit values are set to adequate values (e.g. 300/512M)</em>'),
+      '#markup' => t('<em>Better backup your database first! Also make sure the php\'s max_execution and memory_limit values are set to adequate values (example: 300/512M)</em>'),
     );
   }
   else {
@@ -149,15 +151,25 @@ function os_convert_admin_form_submit(&$form, &$form_state) {
  *
  * @see os_convert_admin_form()
  */
-/*function os_convert_admin_form_reset(&$form, &$form_state) {
+/**
+function os_convert_admin_form_reset(&$form, &$form_state) {
   drupal_set_message(t('Counters resetted.'));
   variable_set('os_convert_progress', 0);
   variable_set('os_convert_remapped', FALSE);
 
   db_query('TRUNCATE `ting_object_convert`');
   db_query('TRUNCATE `ting_object_leftover`');
-}*/
+}
+ */
 
+/**
+ * Custom submit handler for admin form.
+ *
+ * This takes the mapping from the textarea an updates the id's
+ * which could be mapped.
+ *
+ * @see os_convert_admin_form()
+ */
 function os_convert_admin_form_remap(&$form, &$form_state) {
   os_convert_update_left_over();
   $left_over = os_convert_leftover_count(TRUE);
@@ -274,7 +286,7 @@ function os_convert_admin_form_remap(&$form, &$form_state) {
  *
  * Simply update the buttons.
  *
- * @see os_convert_admin_form
+ * @see os_convert_admin_form()
  */
 function _os_convert_admin_form_remap_ajax($form, &$form_state) {
   return $form['os_convert_actions'];
@@ -293,7 +305,7 @@ function _os_convert_admin_form_remap_ajax($form, &$form_state) {
  */
 function os_convert_process_map($map) {
   // Split new lines. This should work with all line ending types.
-  $map_rows = preg_split ('/$\R?^/m', $map);
+  $map_rows = preg_split('/$\R?^/m', $map);
   $array_map = array();
 
   foreach ($map_rows as $row) {
