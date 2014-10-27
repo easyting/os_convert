@@ -5,10 +5,7 @@
  * Administration related items.
  */
 
-define('OS_DEFAULT_MAP', '150005|150005-artikel
-150008|150008-academic
-150012|150012-leksikon
-150014|150014-album
+define('OS_DEFAULT_MAP', '150012|150012-leksikon
 150015|870970-basis
 150016|870971-forfweb
 150017|870971-faktalink
@@ -31,7 +28,6 @@ define('OS_DEFAULT_MAP', '150005|150005-artikel
 150055|150018-fysikkemi
 150056|150018-geografi
 159002|159002-lokalbibl
-870971|870971-avis
 870973|870973-anmeld
 870976|870976-anmeld
 830380|830380-katalog
