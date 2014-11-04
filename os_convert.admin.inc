@@ -57,6 +57,13 @@ function os_convert_admin_form($form, &$form_state) {
       '#description' => t('Use in form of "key|value" (no quotes), where key is old agency id (OS 2.x) and value is the new agency id (OS 3.x)'),
     );
 
+    $form['os_convert_direct'] = array(
+      '#title' => t('Direct mapping'),
+      '#type' => 'checkboxes',
+      '#options' => os_convert_direct_mapping_files(),
+      '#description' => t('Use direct OS 2.x to OS 3.x ids mapping from these files')
+    );
+
     $form['os_convert_actions'] = array(
       '#type' => 'container',
       '#prefix' => '<div id="os-convert-actions">',
@@ -171,12 +178,20 @@ function os_convert_admin_form_reset(&$form, &$form_state) {
  * @see os_convert_admin_form()
  */
 function os_convert_admin_form_remap(&$form, &$form_state) {
+  $time = microtime(TRUE);
   os_convert_update_left_over();
   $left_over = os_convert_leftover_count(TRUE);
 
   $input = $form_state['input'];
   $map = $input['os_convert_map'];
+  $direct_map_sources = array_filter(array_values($input['os_convert_direct']));
   $array_map = os_convert_process_map($map);
+
+  // Pre-load all files with direct mapping.
+  foreach ($direct_map_sources as $source) {
+    os_convert_load_direct_map($source);
+  }
+
   // Multiple update hack. Use mysql CASE structure which is way faster
   // with thousands of records to update than any other method.
   $update_query = "UPDATE {ting_object} set `ding_entity_id` = CASE ";
@@ -212,18 +227,28 @@ function os_convert_admin_form_remap(&$form, &$form_state) {
     $run_query = FALSE;
 
     foreach ($result as $row) {
+      $new_id = NULL;
       $tid = $row->tid;
       $ding_entity_id = urldecode($row->ding_entity_id);
       list($agency, $local_id) = explode(':', $ding_entity_id);
 
+      // Remap the agency
       if (isset($array_map[$agency])) {
-        $run_query = TRUE;
         $new_agency = $array_map[$agency];
         $new_id = $new_agency . ':' . $local_id;
-        // Used in WHERE clause.
+      }
+      // Or get a direct id to id relation, if any.
+      else {
+        $new_id = os_convert_seek_id_replacement($row->ding_entity_id);
+      }
+
+      if ($new_id) {
+        $run_query = TRUE;
+        // Used in UPDATE CASE ... WHERE clause.
         $tids[] = $tid;
+        // Used in DELETE WHERE clause.
         $all_tids[] = $tid;
-        // Used in query placeholders.
+        // Used in UPDATE CASE ... WHERE query placeholders.
         $query_args[] = $tid;
         $query_args[] = $new_id;
         $query_cases[] = " WHEN `tid` = ? THEN ?";
@@ -262,23 +287,25 @@ function os_convert_admin_form_remap(&$form, &$form_state) {
   // The reason why is this outside the main loop is to avoid
   // query LIMIT clashes. When OFFSET is higher than the actual
   // number of rows in the table.
-  $_tids = array();
   $i = 0;
-  foreach ($all_tids as $_tid) {
-    $_tids[] = $_tid;
-
-    if ($i % OS_CONVERT_STEP == 0) {
-      $tids_string = implode(',', $_tids);
-      $_tids = array();
-      db_query($cleanup_query . '(' . $tids_string . ')');
-    }
-
-    $i++;
+  while ($tid_chunk = array_slice($all_tids, $i, OS_CONVERT_STEP)) {
+    $tids_string = implode(',', $tid_chunk);
+    db_query($cleanup_query . '(' . $tids_string . ')');
+    $i += OS_CONVERT_STEP;
   }
 
   variable_set('os_convert_remapped', TRUE);
   os_convert_processed_count(TRUE);
   $form_state['rebuild'] = TRUE;
+
+  $time = microtime(TRUE) - $time;
+  $mem = memory_get_peak_usage(TRUE);
+  $t = array(
+    '@count' => os_convert_processed_count(TRUE),
+    '@time' => $time,
+    '@mem' => $mem,
+  );
+  watchdog('os_convert', 'Converted: @count; Time: @time ms.; Memory: @mem', $t);
 }
 
 /**
@@ -315,4 +342,65 @@ function os_convert_process_map($map) {
   }
 
   return $array_map;
+}
+
+/**
+ * Read for available files with mapping information.
+ *
+ * @see os_convert_admin_form()
+ *
+ * @return Array
+ *   List of files for checkbox labels and values.
+ */
+function os_convert_direct_mapping_files() {
+  $base = drupal_get_path('module', 'os_convert') . '/direct_map/';
+  $files = scandir($base);
+
+  foreach ($files as $k => $file) {
+    if (!is_file($base . $file) || !is_readable($base . $file)) {
+      unset($files[$k]);
+    }
+  }
+
+  return array_combine($files, $files);
+}
+
+/**
+ * Read and statically cache all data stored in mapping files.
+ *
+ * @param string $source
+ *   Filename. Just the filename.
+ * @return Object
+ *   Object data structure for selected file source.
+ */
+function os_convert_load_direct_map($source) {
+  $direct_map = &drupal_static(__FUNCTION__, array());
+
+  if (!isset($direct_map[$source])) {
+    $base = drupal_get_path('module', 'os_convert') . '/direct_map/';
+    $contents = file_get_contents($base . $source);
+    $direct_map[$source] = json_decode($contents);
+  }
+
+  return $direct_map[$source];
+}
+
+/**
+ * Search for statically cached id mapping.
+ *
+ * @param string $id
+ *   Item id whose replacement is searched.
+ * @return mixed
+ *   String if replacement is found, FALSE otherwise.
+ */
+function os_convert_seek_id_replacement($id) {
+  $sources = &drupal_static('os_convert_load_direct_map');
+
+  foreach ($sources as $source) {
+    if (isset($source->{$id})) {
+      return $source->{$id};
+    }
+  }
+
+  return FALSE;
 }
