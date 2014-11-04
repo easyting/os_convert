@@ -94,7 +94,7 @@ function os_convert_update_objects() {
   $data = json_decode($response);
   $temp = array();
 
-  if (is_object($data->searchResponse->result->hitCount) && $data->searchResponse->result->hitCount > 0) {
+  if (is_object($data->searchResponse->result) && $data->searchResponse->result->hitCount->{'$'} > 0) {
     foreach ($data->searchResponse->result->searchResult as $item) {
       $object = $item->collection->object[0];
       $os_3x_id = $object->identifier->{'$'};
