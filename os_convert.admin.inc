@@ -29,6 +29,8 @@ define('OS_DEFAULT_MAP', '150012|150012-leksikon
 150056|150018-geografi
 159002|159002-lokalbibl
 100200|100200-katalog
+159002|159002-katalog
+159011|159011-katalog
 710100|710100-katalog
 714700|714700-katalog
 715300|715300-katalog
@@ -73,14 +75,14 @@ define('OS_DEFAULT_MAP', '150012|150012-leksikon
 775100|775100-katalog
 776600|776600-katalog
 785100|785100-katalog
-870973|870973-anmeld
-870976|870976-anmeld
-830380|830380-katalog
-830190|830190-katalog
-830690|830690-katalog
-830370|830370-katalog
 830060|830060-katalog
-831020|831020-katalog');
+830190|830190-katalog
+830370|830370-katalog
+830380|830380-katalog
+830690|830690-katalog
+831020|831020-katalog
+870973|870973-anmeld
+870976|870976-anmeld');
 
 /**
  * Admin form, tiny interface for conversion progress.
