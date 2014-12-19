@@ -157,38 +157,12 @@ function os_convert_generate_local_id_from_id($item_id) {
 function os_convert_update_left_over() {
   $start = 0;
   db_query('TRUNCATE `ting_object_leftover`');
-
-  while (TRUE) {
-    $result = db_query(""
-      . "SELECT t1.tid, t1.ding_entity_id "
-      . "FROM `ting_object` t1 "
-      . "LEFT JOIN `ting_object_convert` t2 "
-      . "ON t1.tid = t2.tid "
-      . "WHERE t2.tid IS NULL "
-      . "LIMIT $start," . OS_CONVERT_STEP)
-      ->fetchAll();
-
-    if (empty($result)) {
-      break;
-    }
-
-    $left_over_query = db_insert('ting_object_leftover')
-      ->fields(array(
-        'tid',
-        'ding_entity_id',
-    ));
-
-    foreach ($result as $row) {
-      $left_over_query
-        ->values(array(
-          'tid' => $row->tid,
-          'ding_entity_id' => $row->ding_entity_id,
-      ));
-    }
-
-    $left_over_query->execute();
-    $start += OS_CONVERT_STEP;
-  }
+  db_query("INSERT INTO `ting_object_leftover` (`tid`, `ding_entity_id`)
+      SELECT t1.tid, t1.ding_entity_id
+      FROM `ting_object` t1
+      LEFT JOIN `ting_object_convert` t2
+      ON t1.tid = t2.tid
+      WHERE t2.tid IS NULL");
 }
 
 /**

@@ -125,7 +125,7 @@ function os_convert_admin_form($form, &$form_state) {
       '#markup' => t('Overall status (processed/total): @processed/@count', $t),
     );
 
-    $pending = os_convert_leftover_count(TRUE);
+    $pending = $count - $processed;
     $t['@pending'] = $pending;
     $form['os_convert_actions']['os_convert_pending'] = array(
       '#type' => 'item',
