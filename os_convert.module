@@ -78,18 +78,31 @@ function os_convert_update_objects() {
     $ting_query_string[$entry->tid] = $entry->ding_entity_id;
   }
 
-  // @todo
-  // These could be a setting.
-  $client = new NanoSOAPClient('http://opensearch.addi.dk/3.1/');
-  $parameters = array(
-    'agency'      => '100200',
-    'profile'     => 'test',
-    'outputType'  => 'json',
-    'start'       => '1',
-    'stepValue'   => '1',
-    'query'       => 'rec.id=' . os_convert_generate_local_id_from_id($result[0]->ding_entity_id),
-  );
-  $response = $client->call('searchRequest', $parameters);
+  $url = variable_get('ting_search_url', '');
+  $agency = variable_get('ting_agency', '');
+  $profile = variable_get('ting_search_profile', '');
+
+  try {
+    $client = new NanoSOAPClient($url);
+    $parameters = array(
+      'agency'      => $agency,
+      'profile'     => $profile,
+      'outputType'  => 'json',
+      'start'       => '1',
+      'stepValue'   => '1',
+      'query'       => 'rec.id=' . os_convert_generate_local_id_from_id($result[0]->ding_entity_id),
+    );
+    $response = $client->call('searchRequest', $parameters);
+  }
+  catch (Exception $e) {
+    $wt = array(
+      '@url' => $url,
+      '@agency' => $agency,
+      '@profile' => $profile,
+      '@query' => $parameters['query'],
+    );
+    watchdog('os_convert', 'Call failed. @url/@agency/@profile/@query', $wt, WATCHDOG_NOTICE);
+  }
 
   $data = json_decode($response);
   $temp = array();
@@ -140,7 +153,7 @@ function os_convert_update_objects() {
 function os_convert_generate_local_id_from_id($item_id) {
   $id = explode(':', $item_id);
 
-  return $id[1];
+  return isset($id[1]) ? $id[1] : $item_id;
 }
 
 /**
@@ -150,19 +163,18 @@ function os_convert_generate_local_id_from_id($item_id) {
  *   SELECT t1.tid FROM `ting_object` t1
  *   LEFT JOIN `ting_object_convert` t2
  *   ON t1.tid = t2.tid
- *   WHERE t2.tid IS NULL
+ *   WHERE t2.tid IS NULL AND t1.ding_entity_id not regexp '^[0-9]{6}-[^:]+:.*'
  *
  * In plain words - what exists in t1 and not in t2.
  */
 function os_convert_update_left_over() {
-  $start = 0;
   db_query('TRUNCATE `ting_object_leftover`');
   db_query("INSERT INTO `ting_object_leftover` (`tid`, `ding_entity_id`)
       SELECT t1.tid, t1.ding_entity_id
       FROM `ting_object` t1
       LEFT JOIN `ting_object_convert` t2
       ON t1.tid = t2.tid
-      WHERE t2.tid IS NULL");
+      WHERE t2.tid IS NULL AND t1.ding_entity_id not regexp '^[0-9]{6}-[^:]+:.*'");
 }
 
 /**

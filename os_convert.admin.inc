@@ -165,6 +165,8 @@ function os_convert_admin_form($form, &$form_state) {
     );
   }
   else {
+    os_convert_update_left_over();
+
     $percentage = $t['@processed'] * 100 / $t['@count'];
     $t['@percentage'] = sprintf("%.4f", $percentage);
     $form['os_convert_progress_bar'] = array(
@@ -208,7 +210,6 @@ function os_convert_admin_form_submit(&$form, &$form_state) {
 /**
 function os_convert_admin_form_reset(&$form, &$form_state) {
   drupal_set_message(t('Counters resetted.'));
-  variable_set('os_convert_progress', 0);
   variable_set('os_convert_remapped', FALSE);
 
   db_query('TRUNCATE `ting_object_convert`');
